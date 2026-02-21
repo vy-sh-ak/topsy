@@ -1,0 +1,5 @@
+{
+    "environment": "development",
+    "apiKey": "example_api_key",
+    "apiUrl": "wss://example.com/api"
+}
