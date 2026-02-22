@@ -3,48 +3,67 @@ const topsy = @import("topsy");
 const rl = @import("raylib");
 const trade = @import("trade.zig");
 const candle_chart = @import("candlestick_chart.zig");
+const glfw = @import("gui/glfw.zig");
+const imgui = @import("gui/imgui.zig");
+const implot = @import("gui/implot.zig");
 
+const gl = @cImport({
+    @cInclude("GLFW/glfw3.h");
+});
 pub fn main() !void {
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
-    defer _ = gpa.deinit();
-    const allocator = gpa.allocator();
+    try glfw.init();
+    defer glfw.deinit();
 
-    // Open persistent WebSocket stream
-    var stream = try trade.SymbolStream.init(allocator, "ADSK");
-    defer stream.deinit(); // only cleaned up when app exits
+    const window = try glfw.createWindow(1280, 720, "Topsy");
+    defer glfw.destroyWindow(window);
 
-    const screenWidth = 800;
-    const screenHeight = 450;
-    const candle_width = 10;
-    const gap = 5;
+    glfw.makeContextCurrent(window);
+    glfw.swapInterval(1);
 
-    rl.setConfigFlags(rl.ConfigFlags{ .window_resizable = true });
-    rl.initWindow(screenWidth, screenHeight, "Topsy");
-    defer rl.closeWindow();
-    rl.setTargetFPS(60);
+    imgui.init(window);
+    defer imgui.deinit();
 
-    while (!rl.windowShouldClose()) {
-        rl.beginDrawing();
-        defer rl.endDrawing();
+    implot.init();
+    defer implot.deinit();
+    // Sample data
+    const price_data = [_]f32{ 100.0, 102.5, 101.0, 105.0, 103.5, 107.0, 106.0, 110.0, 108.5, 112.0 };
+    const volume_data = [_]f32{ 1500, 2300, 1800, 3200, 2700, 3500, 2100, 4000, 3100, 2800 };
 
-        rl.clearBackground(rl.Color.black);
+    // var show_imgui_demo = false;
+    // var show_implot_demo = false;
 
-        rl.drawText("Symbol: ADSK", 20, 20, 20, rl.Color.dark_gray);
-        if (stream.getLatestData()) |data| {
-            const data_z = allocator.dupeZ(u8, data) catch null;
-            if (data_z) |dz| {
-                defer allocator.free(dz);
-                std.debug.print("Latest data: {s}\n", .{dz});
-                rl.drawText("dz.ptr", 20, 60, 16, rl.Color.gray);
+    while (!glfw.shouldClose(window)) {
+        glfw.pollEvents();
+        imgui.newFrame();
+
+        if (imgui.begin("Topsy Dashboard")) {
+            imgui.text("Welcome to Topsy Trading Dashboard!");
+
+            // if (imgui.button("ImGui Demo")) show_imgui_demo = !show_imgui_demo;
+            // if (imgui.button("ImPlot Demo")) show_implot_demo = !show_implot_demo;
+            // Price chart
+            if (implot.beginPlot("Price")) {
+                implot.setupAxes("Time", "Price ($)");
+                implot.plotLineFloat("BTC/USD", &price_data);
+                implot.endPlot();
             }
-        } else {
-            rl.drawText("Waiting for data...", 20, 60, 16, rl.Color.gray);
+            // Volume chart
+            if (implot.beginPlot("Volume")) {
+                implot.setupAxes("Time", "Volume");
+                implot.plotBarsFloat("Volume", &volume_data);
+                implot.endPlot();
+            }
         }
+        imgui.end();
+        // if (show_imgui_demo) imgui.showDemoWindow();
+        // if (show_implot_demo) implot.showDemoWindow();
+        // Render
+        const fb = glfw.getFramebufferSize(window);
+        gl.glViewport(0, 0, fb.w, fb.h);
+        gl.glClearColor(0.1, 0.1, 0.1, 1.0);
+        gl.glClear(gl.GL_COLOR_BUFFER_BIT);
 
-        for (candle_chart.dummy_candles, 0..) |candle, i| {
-            const idx: i32 = @intCast(i);
-            const x: i32 = 50 + idx * (candle_width + gap);
-            candle_chart.drawCandle(candle, x, candle_width, 400, 700, screenHeight);
-        }
+        imgui.render();
+        glfw.swapBuffers(window);
     }
 }
