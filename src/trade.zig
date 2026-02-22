@@ -1,84 +1,112 @@
 const std = @import("std");
 const ws = @import("websocket");
+const config = @import("config");
+const utils = @import("utils.zig");
+
 const Allocator = std.mem.Allocator;
-const API_KEY = "d6abic9r01qqjvbpqusgd6abic9r01qqjvbpqut0";
-const API_URL = "wss://ws.finnhub.io";
-const API_HOST = "ws.finnhub.io";
+const API_KEY = config.CONFIG_API_KEY;
+const API_URL = config.CONFIG_API_URL;
 
-pub fn getSymbolData(allocator: Allocator, symbol: []const u8) ![]const u8 {
-    var handler = try Handler.init(allocator);
-    defer handler.deinit();
+pub const SymbolStream = struct {
+    handler: *Handler,
+    read_thread: std.Thread,
+    allocator: Allocator,
 
-    // Start reading in a background thread
-    const read_thread = try handler.client.readLoopInNewThread(&handler);
-    defer read_thread.detach();
+    pub fn init(allocator: Allocator, symbol: []const u8) !*SymbolStream {
+        const API_HOST = utils.getHostFromURL(API_URL);
+        const handler = try allocator.create(Handler);
+        handler.* = try Handler.init(allocator, API_HOST);
+        errdefer {
+            handler.deinit();
+            allocator.destroy(handler);
+        }
+        const read_thread = try handler.client.readLoopInNewThread(handler);
 
-    // Build subscribe message: {"type":"subscribe","symbol":"<symbol>"}
-    const msg = try std.fmt.allocPrint(allocator, "{{\"type\":\"subscribe\",\"symbol\":\"{s}\"}}", .{symbol});
-    defer allocator.free(msg);
-    try handler.client.write(msg);
+        const msg = try std.fmt.allocPrint(allocator, "{{\"type\":\"subscribe\",\"symbol\":\"{s}\"}}", .{symbol});
+        defer allocator.free(msg);
+        try handler.client.write(msg);
 
-    // Wait for the first response (with 10s timeout)
-    handler.data_event.timedWait(10 * std.time.ns_per_s) catch
-        return error.Timeout;
-
-    // Return the received data (caller owns the memory)
-    handler.mu.lock();
-    defer handler.mu.unlock();
-    if (handler.received_data) |data| {
-        return data;
+        const self = try allocator.create(SymbolStream);
+        self.* = .{
+            .handler = handler,
+            .read_thread = read_thread,
+            .allocator = allocator,
+        };
+        return self;
     }
-    return error.NoData;
-}
 
-pub fn tradeDemo() !void {
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
-    const allocator = gpa.allocator();
+    /// Returns the latest data, or null if nothing received yet.
+    /// Caller does NOT own the returned slice — it's invalidated on next update.
+    pub fn getLatestData(self: *SymbolStream) ?[]const u8 {
+        self.handler.mu.lock();
+        defer self.handler.mu.unlock();
+        return self.handler.received_data;
+    }
 
-    const data = try getSymbolData(allocator, "ADSK");
-    defer allocator.free(data);
-    std.debug.print("Got data: {s}\n", .{data});
-}
+    /// Call this only when the application is shutting down.
+    pub fn deinit(self: *SymbolStream) void {
+        self.handler.close();
+        self.read_thread.join();
+        self.handler.deinit();
+        self.allocator.destroy(self.handler);
+        self.allocator.destroy(self);
+    }
+};
 
 const Handler = struct {
     client: ws.Client,
     allocator: Allocator,
     received_data: ?[]const u8,
-    data_event: std.Thread.ResetEvent,
     mu: std.Thread.Mutex,
 
-    fn init(allocator: Allocator) !Handler {
-        var client = try ws.Client.init(allocator, .{ .host = API_HOST, .port = 443, .tls = true });
+    fn init(allocator: Allocator, api_host: []const u8) !Handler {
+        var client = try ws.Client.init(allocator, .{ .host = api_host, .port = 443, .tls = true });
         errdefer client.deinit();
-        const request_path = "/?token=" ++ API_KEY;
+
+        const request_path = try std.fmt.allocPrint(allocator, "/?token={s}", .{API_KEY});
+        defer allocator.free(request_path);
+
+        const headers = try std.fmt.allocPrint(allocator, "Host: {s}\r\n", .{api_host});
+        defer allocator.free(headers);
+
         try client.handshake(request_path, .{
             .timeout_ms = 5000,
-            .headers = "Host: " ++ API_HOST ++ "\r\n",
+            .headers = headers,
         });
 
         return .{
             .client = client,
             .allocator = allocator,
             .received_data = null,
-            .data_event = .{},
             .mu = .{},
         };
     }
 
     fn deinit(self: *Handler) void {
+        self.mu.lock();
+        defer self.mu.unlock();
+        if (self.received_data) |d| {
+            self.allocator.free(d);
+            self.received_data = null;
+        }
         self.client.deinit();
     }
 
     pub fn serverMessage(self: *Handler, data: []u8, tpe: ws.MessageTextType) !void {
         switch (tpe) {
             .text => {
+                std.debug.print("Current data: {s}\n", .{data});
+                if (std.mem.indexOf(u8, data, "\"type\":\"ping\"") != null) {
+                    return;
+                }
+                std.debug.print("Received text: {} bytes\n", .{data.len});
                 self.mu.lock();
                 defer self.mu.unlock();
-                // Only capture the first message
-                if (self.received_data == null) {
-                    self.received_data = self.allocator.dupe(u8, data) catch null;
-                    self.data_event.set();
+                // Free previous data before storing new
+                if (self.received_data) |old| {
+                    self.allocator.free(old);
                 }
+                self.received_data = self.allocator.dupe(u8, data) catch null;
             },
             .binary => std.debug.print("Received binary: {} bytes\n", .{data.len}),
         }
@@ -86,5 +114,9 @@ const Handler = struct {
 
     pub fn close(_: *Handler) void {
         std.debug.print("Connection closed\n", .{});
+    }
+
+    pub fn serverError(_: *Handler, err: anyerror) void {
+        std.debug.print("Server error: {}\n", .{err});
     }
 };
