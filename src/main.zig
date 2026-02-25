@@ -2,11 +2,10 @@ const std = @import("std");
 const topsy = @import("topsy");
 const rl = @import("raylib");
 const trade = @import("trade.zig");
-const candle_chart = @import("candlestick_chart.zig");
 const glfw = @import("gui/glfw.zig");
 const imgui = @import("gui/imgui.zig");
 const implot = @import("gui/implot.zig");
-
+const hc = @import("data/http_client.zig");
 const gl = @cImport({
     @cInclude("GLFW/glfw3.h");
 });
@@ -39,8 +38,24 @@ pub fn main() !void {
         if (imgui.begin("Topsy Dashboard")) {
             imgui.text("Welcome to Topsy Trading Dashboard!");
 
-            // if (imgui.button("ImGui Demo")) show_imgui_demo = !show_imgui_demo;
-            // if (imgui.button("ImPlot Demo")) show_implot_demo = !show_implot_demo;
+            if (imgui.button("Fetch Data")) {
+                var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+                defer _ = gpa.deinit();
+
+                const client = hc.HttpClient{
+                    .url = "http://httpbin.org/headers",
+                    .allocator = gpa.allocator(),
+                };
+                if (client.send()) |*response| {
+                    defer @constCast(response).deinit();
+                    std.debug.print("Status: {s}\nBody: {s}\n", .{
+                        @tagName(response.status),
+                        response.body,
+                    });
+                } else |err| {
+                    std.debug.print("Fetch failed: {}\n", .{err});
+                }
+            }
             // Price chart
             if (implot.beginPlot("Price")) {
                 implot.setupAxes("Time", "Price ($)");
