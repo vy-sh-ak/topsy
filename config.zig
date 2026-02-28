@@ -112,3 +112,15 @@ pub fn setCimplot(b: *std.Build) *std.Build.Step.Compile {
     cimplot.root_module.addIncludePath(b.path("libs/cimgui/imgui"));
     return cimplot;
 }
+
+pub fn setStbi(b: *std.Build) *std.Build.Step.Compile {
+    const stbi = b.addLibrary(.{ .name = "stbi", .root_module = b.createModule(.{ .target = b.graph.host, .link_libc = true }) });
+    stbi.root_module.addCSourceFiles(.{
+        .files = &.{
+            "libs/stbi/stbi_impl.c",
+        },
+        .flags = &.{},
+    });
+    stbi.root_module.addIncludePath(b.path("libs/stbi"));
+    return stbi;
+}

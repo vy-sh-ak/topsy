@@ -15,7 +15,7 @@ pub fn main() !void {
 
     const window = try glfw.createWindow(1280, 720, "Topsy");
     defer glfw.destroyWindow(window);
-
+    glfw.setWindowIcon(window, @embedFile("assets/fire.png"));
     glfw.makeContextCurrent(window);
     glfw.swapInterval(1);
 

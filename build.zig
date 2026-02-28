@@ -14,6 +14,7 @@ pub fn build(b: *std.Build) void {
     const glfw = conf.setGLFW(b);
     const cimgui = conf.setCimgui(b);
     const cimplot = conf.setCimplot(b);
+    const stbi = conf.setStbi(b);
     //websockets
     const websocket = b.dependency("websocket", .{
         .target = target,
@@ -48,6 +49,7 @@ pub fn build(b: *std.Build) void {
     exe.root_module.linkLibrary(glfw);
     exe.root_module.linkLibrary(cimgui);
     exe.root_module.linkLibrary(cimplot);
+    exe.root_module.linkLibrary(stbi);
     exe.root_module.linkSystemLibrary("opengl32", .{});
     exe.root_module.linkSystemLibrary("gdi32", .{});
     exe.root_module.linkSystemLibrary("user32", .{});
@@ -59,7 +61,7 @@ pub fn build(b: *std.Build) void {
     exe.root_module.addIncludePath(b.path("libs/cimgui/imgui/backends"));
     exe.root_module.addIncludePath(b.path("libs/cimplot"));
     exe.root_module.addIncludePath(b.path("libs/cimplot/implot"));
-
+    exe.root_module.addIncludePath(b.path("libs/stbi"));
     conf.setConfig(b.allocator, exe, "config.json");
 
     // dependency management and build steps start here
