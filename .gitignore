@@ -1,4 +1,3 @@
 .zig-cache
 config.json
-.zig-out
-.zig-out/*
+zig-out
