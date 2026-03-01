@@ -1,3 +1,4 @@
+const std = @import("std");
 pub const c = @cImport({
     @cDefine("CIMGUI_USE_GLFW", "");
     @cDefine("CIMGUI_DEFINE_ENUMS_AND_STRUCTS", "");
@@ -29,8 +30,21 @@ pub fn render() void {
     c.igRender();
     c.ImGui_ImplOpenGL3_RenderDrawData(c.igGetDrawData());
 }
-pub fn begin(name: [*c]const u8) bool {
-    return c.igBegin(name, null, 0);
+pub const ImguiWindowFlags = struct {
+    NoTitleBar: bool,
+    NoResize: bool,
+    NoMove: bool,
+    NoScrollbar: bool,
+    NoCollapse: bool,
+};
+pub fn begin(name: [*c]const u8, flags: ImguiWindowFlags) bool {
+    var combined_flags: c.ImGuiWindowFlags = 0;
+    if (flags.NoTitleBar) combined_flags |= c.ImGuiWindowFlags_NoTitleBar;
+    if (flags.NoResize) combined_flags |= c.ImGuiWindowFlags_NoResize;
+    if (flags.NoMove) combined_flags |= c.ImGuiWindowFlags_NoMove;
+    if (flags.NoScrollbar) combined_flags |= c.ImGuiWindowFlags_NoScrollbar;
+    if (flags.NoCollapse) combined_flags |= c.ImGuiWindowFlags_NoCollapse;
+    return c.igBegin(name, null, combined_flags);
 }
 pub fn end() void {
     c.igEnd();
@@ -48,4 +62,52 @@ pub fn sliderFloat(label: [*c]const u8, v: *f32, min: f32, max: f32) bool {
 
 pub fn showDemoWindow() void {
     c.igShowDemoWindow(null);
+}
+
+pub fn setFullSize(w: f32, h: f32) void {
+    c.igSetNextWindowPos(ImVec2{ .x = 0, .y = 0 }, c.ImGuiCond_Always, ImVec2{ .x = 0, .y = 0 });
+    c.igSetNextWindowSize(ImVec2{ .x = w, .y = h }, c.ImGuiCond_Always);
+}
+
+pub fn getIO() [*c]c.struct_ImGuiIO {
+    return c.igGetIO_Nil();
+}
+// font controls
+pub fn setFont(io: [*c]c.struct_ImGuiIO, font_data: []const u8) [*c]c.struct_ImFont {
+    _ = c.ImFontAtlas_AddFontDefault(io.*.Fonts, null);
+    const cfg = c.ImFontConfig_ImFontConfig();
+    defer c.ImFontConfig_destroy(cfg);
+    cfg.*.FontDataOwnedByAtlas = false;
+    return c.ImFontAtlas_AddFontFromMemoryTTF(
+        io.*.Fonts,
+        @constCast(font_data.ptr),
+        @intCast(font_data.len),
+        18.5,
+        cfg,
+        null,
+    );
+}
+
+pub fn pushFont(font: [*c]c.struct_ImFont) void {
+    c.igPushFont(font, 18.5);
+}
+
+pub fn popFont() void {
+    c.igPopFont();
+}
+
+//combo or dropdown
+pub fn dropdown(label: [*c]const u8, options: []const []const u8, current_value: *[]const u8) void {
+    if (c.igBeginCombo(label, current_value.*.ptr, c.ImGuiComboFlags_HeightLarge)) {
+        for (options) |option| {
+            const is_selected = std.mem.eql(u8, current_value.*, option);
+            if (c.igSelectable_Bool(option.ptr, is_selected, c.ImGuiSelectableFlags_None, .{ .x = 0, .y = 0 })) {
+                current_value.* = option;
+            }
+            if (is_selected) {
+                c.igSetItemDefaultFocus();
+            }
+        }
+        c.igEndCombo();
+    }
 }

@@ -24,19 +24,28 @@ pub fn main() !void {
 
     implot.init();
     defer implot.deinit();
+
+    const io = imgui.getIO();
+    const interFont = imgui.setFont(io, @embedFile("assets/inter.ttf"));
     // Sample data
     const price_data = [_]f32{ 100.0, 102.5, 101.0, 105.0, 103.5, 107.0, 106.0, 110.0, 108.5, 112.0 };
-    const volume_data = [_]f32{ 1500, 2300, 1800, 3200, 2700, 3500, 2100, 4000, 3100, 2800 };
+    // const volume_data = [_]f32{ 1500, 2300, 1800, 3200, 2700, 3500, 2100, 4000, 3100, 2800 };
 
     // var show_imgui_demo = false;
     // var show_implot_demo = false;
-
+    var current_item: []const u8 = "ADSK";
+    const symbols = [_][]const u8{"ADSK", "AAPL"};
     while (!glfw.shouldClose(window)) {
         glfw.pollEvents();
         imgui.newFrame();
+        const window_size = glfw.getWindowSize(window);
+        imgui.setFullSize(@floatFromInt(window_size.w), @floatFromInt(window_size.h));
+        if (imgui.begin("Topsy Dashboard", imgui.ImguiWindowFlags{ .NoTitleBar = true, .NoResize = true, .NoMove = true, .NoScrollbar = true, .NoCollapse = true })) {
+            imgui.pushFont(interFont);
+            imgui.dropdown("Symbols", &symbols, &current_item);
+            // imgui.text("Topsy Trading Dashboard");
 
-        if (imgui.begin("Topsy Dashboard")) {
-            imgui.text("Welcome to Topsy Trading Dashboard!");
+            
 
             if (imgui.button("Fetch Data")) {
                 var gpa = std.heap.GeneralPurposeAllocator(.{}){};
@@ -59,15 +68,16 @@ pub fn main() !void {
             // Price chart
             if (implot.beginPlot("Price")) {
                 implot.setupAxes("Time", "Price ($)");
-                implot.plotLineFloat("BTC/USD", &price_data);
+                implot.plotBarsFloat("BTC/USD", &price_data);
                 implot.endPlot();
             }
             // Volume chart
-            if (implot.beginPlot("Volume")) {
-                implot.setupAxes("Time", "Volume");
-                implot.plotBarsFloat("Volume", &volume_data);
-                implot.endPlot();
-            }
+            // if (implot.beginPlot("Volume")) {
+            //     implot.setupAxes("Time", "Volume");
+            //     implot.plotBarsFloat("Volume", &volume_data);
+            //     implot.endPlot();
+            // }
+            imgui.popFont();
         }
         imgui.end();
         // if (show_imgui_demo) imgui.showDemoWindow();

@@ -79,3 +79,10 @@ pub fn getFramebufferSize(window: Window) struct { w: c_int, h: c_int } {
     c.glfwGetFramebufferSize(window, &w, &h);
     return .{ .w = w, .h = h };
 }
+
+pub fn getWindowSize(window: Window) struct { w: c_int, h: c_int } {
+    var w: c_int = 0;
+    var h: c_int = 0;
+    c.glfwGetWindowSize(window, &w, &h);
+    return .{ .w = w, .h = h };
+}
