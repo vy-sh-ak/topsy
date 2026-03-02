@@ -43,7 +43,7 @@ pub fn main() !void {
         if (imgui.begin("Topsy Dashboard", imgui.ImguiWindowFlags{ .NoTitleBar = true, .NoResize = true, .NoMove = true, .NoScrollbar = true, .NoCollapse = true })) {
             imgui.pushFont(interFont);
             imgui.dropdown("Symbols", &symbols, &current_item);
-            // imgui.text("Topsy Trading Dashboard");
+            imgui.buttonGroup();
 
             
 

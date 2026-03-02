@@ -98,6 +98,7 @@ pub fn popFont() void {
 
 //combo or dropdown
 pub fn dropdown(label: [*c]const u8, options: []const []const u8, current_value: *[]const u8) void {
+    c.igSetNextItemWidth(100.0);
     if (c.igBeginCombo(label, current_value.*.ptr, c.ImGuiComboFlags_HeightLarge)) {
         for (options) |option| {
             const is_selected = std.mem.eql(u8, current_value.*, option);
@@ -109,5 +110,27 @@ pub fn dropdown(label: [*c]const u8, options: []const []const u8, current_value:
             }
         }
         c.igEndCombo();
+    }
+}
+
+pub fn buttonGroup() void {
+    if (c.igButton("1D", .{ .x = 0, .y = 0 })) {
+        std.debug.print("1D button clicked\n", .{});
+    }
+    c.igSameLine(0, 20.0);
+    if (c.igButton("1W", .{ .x = 0, .y = 0 })) {
+        std.debug.print("1W button clicked\n", .{});
+    }
+    c.igSameLine(0, 20.0);
+    if (c.igButton("1M", .{ .x = 0, .y = 0 })) {
+        std.debug.print("1M button clicked\n", .{});
+    }   
+    c.igSameLine(0, 20.0);
+    if (c.igButton("1Y", .{ .x = 0, .y = 0 })) {
+        std.debug.print("1Y button clicked\n", .{});
+    }
+    c.igSameLine(0, 20.0);
+    if (c.igButton("5Y", .{ .x = 0, .y = 0 })) {
+        std.debug.print("5Y button clicked\n", .{});
     }
 }
