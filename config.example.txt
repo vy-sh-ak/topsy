@@ -1,5 +1,7 @@
 {
     "environment": "development",
     "apiKey": "example_api_key",
-    "apiUrl": "wss://example.com/api"
+    "apiUrl": "wss://example.com/api",
+    "simFinURL" : "https://backend.simfin.com",
+    "simFinKey": "testj-key-here"
 }

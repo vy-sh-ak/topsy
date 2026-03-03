@@ -1,5 +1,4 @@
 const std = @import("std");
-const utils = @import("../utils.zig");
 pub const c = @cImport({
     @cDefine("CIMGUI_USE_GLFW", "");
     @cDefine("CIMGUI_DEFINE_ENUMS_AND_STRUCTS", "");
@@ -111,28 +110,5 @@ pub fn dropdown(label: [*c]const u8, options: []const []const u8, current_value:
             }
         }
         c.igEndCombo();
-    }
-}
-
-pub fn buttonGroup() void {
-    if (c.igButton("1D", .{ .x = 0, .y = 0 })) {
-        const date = utils.currentDateUTC();
-        std.debug.print("1D button clicked: {!s}\n", .{date});
-    }
-    c.igSameLine(0, 20.0);
-    if (c.igButton("1W", .{ .x = 0, .y = 0 })) {
-        std.debug.print("1W button clicked\n", .{});
-    }
-    c.igSameLine(0, 20.0);
-    if (c.igButton("1M", .{ .x = 0, .y = 0 })) {
-        std.debug.print("1M button clicked\n", .{});
-    }   
-    c.igSameLine(0, 20.0);
-    if (c.igButton("1Y", .{ .x = 0, .y = 0 })) {
-        std.debug.print("1Y button clicked\n", .{});
-    }
-    c.igSameLine(0, 20.0);
-    if (c.igButton("5Y", .{ .x = 0, .y = 0 })) {
-        std.debug.print("5Y button clicked\n", .{});
     }
 }

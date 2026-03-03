@@ -5,10 +5,12 @@ const trade = @import("trade.zig");
 const glfw = @import("gui/glfw.zig");
 const imgui = @import("gui/imgui.zig");
 const implot = @import("gui/implot.zig");
-const hc = @import("data/http_client.zig");
+const button_group = @import("components/button_group.zig");
+const fetch_data_button = @import("components/fetch_data_button.zig");
 const gl = @cImport({
     @cInclude("GLFW/glfw3.h");
 });
+const utils = @import("utils.zig");
 pub fn main() !void {
     try glfw.init();
     defer glfw.deinit();
@@ -33,8 +35,10 @@ pub fn main() !void {
 
     // var show_imgui_demo = false;
     // var show_implot_demo = false;
-    var current_item: []const u8 = "ADSK";
-    const symbols = [_][]const u8{"ADSK", "AAPL"};
+    var current_symbol: []const u8 = "ADSK";
+    const symbols = [_][]const u8{ "ADSK", "AAPL" };
+    const current_date = try utils.currentDateUTC();
+    var end_date = try utils.subtractDuration(current_date, .{ .days = 1});
     while (!glfw.shouldClose(window)) {
         glfw.pollEvents();
         imgui.newFrame();
@@ -42,29 +46,9 @@ pub fn main() !void {
         imgui.setFullSize(@floatFromInt(window_size.w), @floatFromInt(window_size.h));
         if (imgui.begin("Topsy Dashboard", imgui.ImguiWindowFlags{ .NoTitleBar = true, .NoResize = true, .NoMove = true, .NoScrollbar = true, .NoCollapse = true })) {
             imgui.pushFont(interFont);
-            imgui.dropdown("Symbols", &symbols, &current_item);
-            imgui.buttonGroup();
-
-            
-
-            if (imgui.button("Fetch Data")) {
-                var gpa = std.heap.GeneralPurposeAllocator(.{}){};
-                defer _ = gpa.deinit();
-
-                const client = hc.HttpClient{
-                    .url = "http://httpbin.org/headers",
-                    .allocator = gpa.allocator(),
-                };
-                if (client.send()) |*response| {
-                    defer @constCast(response).deinit();
-                    std.debug.print("Status: {s}\nBody: {s}\n", .{
-                        @tagName(response.status),
-                        response.body,
-                    });
-                } else |err| {
-                    std.debug.print("Fetch failed: {}\n", .{err});
-                }
-            }
+            imgui.dropdown("Symbols", &symbols, &current_symbol);
+            try button_group.buttonGroup(current_date, &end_date);
+            try fetch_data_button.fetchDataButton(current_symbol,current_date, end_date);
             // Price chart
             if (implot.beginPlot("Price")) {
                 implot.setupAxes("Time", "Price ($)");

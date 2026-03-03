@@ -5,6 +5,8 @@ const Config = struct {
     environment: []const u8,
     apiKey: []const u8,
     apiUrl: []const u8,
+    simFinURL: []const u8,
+    simFinKey: []const u8,
 };
 
 pub fn setConfig(allocator: std.mem.Allocator, exe: *std.Build.Step.Compile, path: []const u8) void {
@@ -13,6 +15,8 @@ pub fn setConfig(allocator: std.mem.Allocator, exe: *std.Build.Step.Compile, pat
     options.addOption([]const u8, "CONFIG_ENVIRONMENT", config.environment);
     options.addOption([]const u8, "CONFIG_API_KEY", config.apiKey);
     options.addOption([]const u8, "CONFIG_API_URL", config.apiUrl);
+    options.addOption([]const u8, "CONFIG_SIMFIN_URL", config.simFinURL);
+    options.addOption([]const u8, "CONFIG_SIMFIN_KEY", config.simFinKey);
 
     exe.root_module.addOptions("config", options);
 }
@@ -28,6 +32,8 @@ fn parseConfig(allocator: std.mem.Allocator, path: []const u8) Config {
         .environment = allocator.dupe(u8, parsed.value.environment) catch unreachable,
         .apiKey = allocator.dupe(u8, parsed.value.apiKey) catch unreachable,
         .apiUrl = allocator.dupe(u8, parsed.value.apiUrl) catch unreachable,
+        .simFinURL = allocator.dupe(u8, parsed.value.simFinURL) catch unreachable,
+        .simFinKey = allocator.dupe(u8, parsed.value.simFinKey) catch unreachable,
     };
 }
 

@@ -3,6 +3,7 @@ const std = @import("std");
 pub const HttpClient = struct {
     url: []const u8,
     method: std.http.Method = .GET,
+    headers: []const std.http.Header = &.{},
     allocator: std.mem.Allocator,
 
     pub const Response = struct {
@@ -25,6 +26,7 @@ pub const HttpClient = struct {
         const result = try client.fetch(.{
             .location = .{ .url = self.url },
             .method = self.method,
+            .extra_headers = self.headers,
             .response_writer = &aw.writer,
         });
 
