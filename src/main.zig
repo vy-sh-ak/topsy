@@ -7,6 +7,7 @@ const imgui = @import("gui/imgui.zig");
 const implot = @import("gui/implot.zig");
 const button_group = @import("components/button_group.zig");
 const fetch_data_button = @import("components/fetch_data_button.zig");
+const candle_chart = @import("components/candle_chart.zig");
 const gl = @cImport({
     @cInclude("GLFW/glfw3.h");
 });
@@ -29,12 +30,7 @@ pub fn main() !void {
 
     const io = imgui.getIO();
     const interFont = imgui.setFont(io, @embedFile("assets/inter.ttf"));
-    // Sample data
-    const price_data = [_]f32{ 100.0, 102.5, 101.0, 105.0, 103.5, 107.0, 106.0, 110.0, 108.5, 112.0 };
-    // const volume_data = [_]f32{ 1500, 2300, 1800, 3200, 2700, 3500, 2100, 4000, 3100, 2800 };
 
-    // var show_imgui_demo = false;
-    // var show_implot_demo = false;
     var current_symbol: []const u8 = "ADSK";
     const symbols = [_][]const u8{ "ADSK", "AAPL" };
     const current_date = try utils.currentDateUTC();
@@ -49,24 +45,10 @@ pub fn main() !void {
             imgui.dropdown("Symbols", &symbols, &current_symbol);
             try button_group.buttonGroup(current_date, &end_date);
             try fetch_data_button.fetchDataButton(current_symbol,current_date, end_date);
-            // Price chart
-            if (implot.beginPlot("Price")) {
-                implot.setupAxes("Time", "Price ($)");
-                implot.plotBarsFloat("BTC/USD", &price_data);
-                implot.endPlot();
-            }
-            // Volume chart
-            // if (implot.beginPlot("Volume")) {
-            //     implot.setupAxes("Time", "Volume");
-            //     implot.plotBarsFloat("Volume", &volume_data);
-            //     implot.endPlot();
-            // }
+            candle_chart.renderCandleChart();
             imgui.popFont();
         }
         imgui.end();
-        // if (show_imgui_demo) imgui.showDemoWindow();
-        // if (show_implot_demo) implot.showDemoWindow();
-        // Render
         const fb = glfw.getFramebufferSize(window);
         gl.glViewport(0, 0, fb.w, fb.h);
         gl.glClearColor(0.1, 0.1, 0.1, 1.0);
