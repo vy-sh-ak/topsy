@@ -1,3 +1,4 @@
+const std = @import("std");
 const imgui = @import("../gui/imgui.zig");
 const implot = @import("../gui/implot.zig");
 
@@ -22,8 +23,52 @@ const highs = [_]f64{ 103.0, 103.5, 106.0, 106.0, 108.0, 108.5, 110.0, 110.5, 11
 var show_tooltip: bool = false;
 var bullCol: implot.c.ImVec4 = .{ .x = 0.000, .y = 1.000, .z = 0.441, .w = 1.000 };
 var bearCol: implot.c.ImVec4 = .{ .x = 0.853, .y = 0.050, .z = 0.310, .w = 1.000 };
+var last_range_len: usize = 0;
+var last_x_min: f64 = 0;
+var last_x_max: f64 = 0;
+var last_y_min: f64 = 0;
+var last_y_max: f64 = 0;
 
-pub fn renderCandleChart() void {
+pub const CandleChartData = struct {
+    allocator: std.mem.Allocator,
+    symbol: [:0]u8,
+    dates: []f64,
+    opens: []f64,
+    closes: []f64,
+    lows: []f64,
+    highs: []f64,
+
+    pub fn init(allocator: std.mem.Allocator, symbol: []const u8, len: usize) !CandleChartData {
+        return .{
+            .allocator = allocator,
+            .symbol = try allocator.dupeZ(u8, symbol),
+            .dates = try allocator.alloc(f64, len),
+            .opens = try allocator.alloc(f64, len),
+            .closes = try allocator.alloc(f64, len),
+            .lows = try allocator.alloc(f64, len),
+            .highs = try allocator.alloc(f64, len),
+        };
+    }
+
+    pub fn deinit(self: *CandleChartData) void {
+        self.allocator.free(self.symbol);
+        self.allocator.free(self.dates);
+        self.allocator.free(self.opens);
+        self.allocator.free(self.closes);
+        self.allocator.free(self.lows);
+        self.allocator.free(self.highs);
+    }
+};
+
+pub fn renderCandleChart(data: ?*const CandleChartData) void {
+    const chart_symbol: [:0]const u8 = if (data) |d| d.symbol else "GOOGL";
+    const chart_dates: []const f64 = if (data) |d| d.dates else dates[0..];
+    const chart_opens: []const f64 = if (data) |d| d.opens else opens[0..];
+    const chart_closes: []const f64 = if (data) |d| d.closes else closes[0..];
+    const chart_lows: []const f64 = if (data) |d| d.lows else lows[0..];
+    const chart_highs: []const f64 = if (data) |d| d.highs else highs[0..];
+    if (chart_dates.len == 0) return;
+
     _ = imgui.c.igCheckbox("Show Tooltip", &show_tooltip);
     imgui.c.igSameLine(0, 10.0);
     _ = imgui.c.igColorEdit4("##Bull", &bullCol.x, imgui.c.ImGuiColorEditFlags_NoInputs);
@@ -32,37 +77,60 @@ pub fn renderCandleChart() void {
 
     implot.c.ImPlot_GetStyle().*.UseLocalTime = false;
 
-    const x_min = dates[0];
-    const x_max = dates[dates.len - 1];
-    var y_min = lows[0];
-    var y_max = highs[0];
-    for (1..lows.len) |i| {
-        y_min = @min(y_min, lows[i]);
-        y_max = @max(y_max, highs[i]);
+    var x_min = chart_dates[0];
+    var x_max = chart_dates[0];
+    for (1..chart_dates.len) |i| {
+        x_min = @min(x_min, chart_dates[i]);
+        x_max = @max(x_max, chart_dates[i]);
     }
-    const y_pad = @max((y_max - y_min) * 0.10, 1.0);
-    const min_zoom = 60.0 * 60.0 * 24.0;
-    const max_zoom = x_max - x_min;
-    implot.c.ImPlot_PushStyleColor_Vec4(implot.c.ImPlotCol_PlotBg, .{ .w = 0, .x = 0, .y = 0, .z = 1 });
-    if (implot.c.ImPlot_BeginPlot("Candlestick Chart", .{ .x = -1, .y = 500 }, 0)) {
-        // X axis: auto range; Y axis: auto-fit + range-fit
-        implot.c.ImPlot_SetupAxes(null, null, 0, implot.c.ImPlotAxisFlags_AutoFit | implot.c.ImPlotAxisFlags_RangeFit);
+    const x_span = x_max - x_min;
+    var y_min = chart_lows[0];
+    var y_max = chart_highs[0];
+    for (1..chart_lows.len) |i| {
+        y_min = @min(y_min, chart_lows[i]);
+        y_max = @max(y_max, chart_highs[i]);
+    }
+    const x_pad = @max(x_span * 0.08, 60.0 * 60.0 * 24.0);
+    const y_pad = @max((y_max - y_min) * 0.15, 1.0);
+    const range_changed =
+        chart_dates.len != last_range_len or
+        x_min != last_x_min or
+        x_max != last_x_max or
+        y_min != last_y_min or
+        y_max != last_y_max;
 
-        // Set initial view window from current data range
-        implot.c.ImPlot_SetupAxesLimits(x_min, x_max, y_min - y_pad, y_max + y_pad, implot.c.ImPlotCond_Once);
+    if (range_changed) {
+        last_range_len = chart_dates.len;
+        last_x_min = x_min;
+        last_x_max = x_max;
+        last_y_min = y_min;
+        last_y_max = y_max;
+    }
+
+    implot.c.ImPlot_PushStyleColor_Vec4(implot.c.ImPlotCol_PlotBg, .{ .w = 0, .x = 0, .y = 0, .z = 1 });
+    const available_height = imgui.c.igGetContentRegionAvail().y;
+    if (implot.c.ImPlot_BeginPlot("Candlestick Chart", .{ .x = -1, .y = available_height - 100 }, 0)) {
+        // Keep axes fully interactive (pan/zoom); only set an initial centered window.
+        implot.c.ImPlot_SetupAxes(null, null, 0, 0);
+
+        // Reset view when dataset changes, otherwise keep user's current pan/zoom state.
+        implot.c.ImPlot_SetupAxesLimits(
+            x_min - x_pad,
+            x_max + x_pad,
+            y_min - y_pad,
+            y_max + y_pad,
+            if (range_changed) implot.c.ImPlotCond_Always else implot.c.ImPlotCond_Once,
+        );
 
         // Use time scale on X axis (renders dates automatically)
         implot.c.ImPlot_SetupAxisScale_PlotScale(implot.c.ImAxis_X1, implot.c.ImPlotScale_Time);
-
-        // Prevent panning/zooming outside the data range
-        implot.c.ImPlot_SetupAxisLimitsConstraints(implot.c.ImAxis_X1, x_min, x_max);
-        implot.c.ImPlot_SetupAxisZoomConstraints(implot.c.ImAxis_X1, min_zoom, max_zoom);
 
         // Format Y axis as dollar values
         implot.c.ImPlot_SetupAxisFormat_Str(implot.c.ImAxis_Y1, "$%.0f");
 
         // Draw the candlestick chart
-        implot.plotCandleStick("GOOGL", dates[0..], opens[0..], closes[0..], lows[0..], highs[0..], @intCast(dates.len), show_tooltip, 0.25, bullCol, bearCol);
+        const candle_width_pct: f32 = if (chart_dates.len > 1) 0.25 else 60.0 * 60.0 * 8.0;
+        implot.plotCandleStick(chart_symbol.ptr, chart_dates, chart_opens, chart_closes, chart_lows, chart_highs, @intCast(chart_dates.len), show_tooltip, candle_width_pct, bullCol, bearCol);
 
         implot.c.ImPlot_EndPlot();
     }

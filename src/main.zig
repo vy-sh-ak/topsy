@@ -13,6 +13,10 @@ const gl = @cImport({
 });
 const utils = @import("utils.zig");
 pub fn main() !void {
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    defer _ = gpa.deinit();
+    const allocator = gpa.allocator();
+
     try glfw.init();
     defer glfw.deinit();
 
@@ -35,6 +39,9 @@ pub fn main() !void {
     const symbols = [_][]const u8{ "ADSK", "AAPL" };
     const current_date = try utils.currentDateUTC();
     var end_date = try utils.subtractDuration(current_date, .{ .days = 1});
+    var chart_data: ?candle_chart.CandleChartData = null;
+    defer if (chart_data) |*existing_data| existing_data.deinit();
+
     while (!glfw.shouldClose(window)) {
         glfw.pollEvents();
         imgui.newFrame();
@@ -44,8 +51,11 @@ pub fn main() !void {
             imgui.pushFont(interFont);
             imgui.dropdown("Symbols", &symbols, &current_symbol);
             try button_group.buttonGroup(current_date, &end_date);
-            try fetch_data_button.fetchDataButton(current_symbol,current_date, end_date);
-            candle_chart.renderCandleChart();
+            if (try fetch_data_button.fetchDataButton(current_symbol, current_date, end_date, allocator)) |new_data| {
+                if (chart_data) |*old_data| old_data.deinit();
+                chart_data = new_data;
+            }
+            candle_chart.renderCandleChart(if (chart_data) |*d| d else null);
             imgui.popFont();
         }
         imgui.end();
