@@ -56,6 +56,53 @@ pub fn button(label: [*c]const u8) bool {
     return c.igButton(label, .{ .x = 0, .y = 0 });
 }
 
+pub const ButtonVariant = enum {
+    Primary,
+    Secondary,
+};
+
+const ButtonColors = struct {
+    base: c.ImVec4,
+    hover: c.ImVec4,
+    active: c.ImVec4,
+};
+
+fn getButtonColors(variant: ButtonVariant) ButtonColors {
+    return switch (variant) {
+        .Primary => .{
+            .base = .{ .x = 0.93, .y = 0.33, .z = 0.10, .w = 1.0 },
+            .hover = .{ .x = 1.00, .y = 0.42, .z = 0.15, .w = 1.0 },
+            .active = .{ .x = 0.82, .y = 0.27, .z = 0.08, .w = 1.0 },
+        },
+        .Secondary => .{
+            .base = .{ .x = 0.20, .y = 0.14, .z = 0.30, .w = 1.0 },
+            .hover = .{ .x = 0.28, .y = 0.20, .z = 0.40, .w = 1.0 },
+            .active = .{ .x = 0.16, .y = 0.11, .z = 0.24, .w = 1.0 },
+        },
+    };
+}
+
+pub fn styledButton(label: [*c]const u8) bool {
+    return styledButtonVariant(label, .Secondary);
+}
+
+pub fn styledButtonVariant(label: [*c]const u8, variant: ButtonVariant) bool {
+    const colors = getButtonColors(variant);
+
+    c.igPushStyleVar_Float(c.ImGuiStyleVar_FrameRounding, 2.0);
+    c.igPushStyleVar_Vec2(c.ImGuiStyleVar_FramePadding, .{ .x = 8, .y = 6 });
+    c.igPushStyleColor_Vec4(c.ImGuiCol_Button, colors.base);
+    c.igPushStyleColor_Vec4(c.ImGuiCol_ButtonHovered, colors.hover);
+    c.igPushStyleColor_Vec4(c.ImGuiCol_ButtonActive, colors.active);
+    c.igPushStyleColor_Vec4(c.ImGuiCol_Text, .{ .x = 0.96, .y = 0.96, .z = 0.98, .w = 1.0 });
+
+    const pressed = c.igButton(label, .{ .x = 0, .y = 0 });
+
+    c.igPopStyleColor(4);
+    c.igPopStyleVar(2);
+    return pressed;
+}
+
 pub fn sliderFloat(label: [*c]const u8, v: *f32, min: f32, max: f32) bool {
     return c.igSliderFloat(label, v, min, max, "%.3f", 0);
 }
@@ -96,6 +143,29 @@ pub fn popFont() void {
     c.igPopFont();
 }
 
+pub const InputOnChangeFn = *const fn (value: []const u8, user_data: ?*anyopaque) void;
+
+const InputTextCallbackCtx = struct {
+    on_change: InputOnChangeFn,
+    user_data: ?*anyopaque,
+};
+
+fn inputTextOnEdit(data: [*c]c.ImGuiInputTextCallbackData) callconv(.c) c_int {
+    const raw_user_data = data.*.UserData orelse return 0;
+    const ctx: *InputTextCallbackCtx = @ptrCast(@alignCast(raw_user_data));
+
+    const text_len_i32 = data.*.BufTextLen;
+    if (text_len_i32 <= 0) {
+        ctx.on_change("", ctx.user_data);
+        return 0;
+    }
+
+    const text_len: usize = @intCast(text_len_i32);
+    const buf: [*]u8 = @ptrCast(data.*.Buf);
+    ctx.on_change(buf[0..text_len], ctx.user_data);
+    return 0;
+}
+
 //combo or dropdown
 pub fn dropdown(label: [*c]const u8, options: []const []const u8, current_value: *[]const u8) void {
     c.igSetNextItemWidth(100.0);
@@ -111,4 +181,39 @@ pub fn dropdown(label: [*c]const u8, options: []const []const u8, current_value:
         }
         c.igEndCombo();
     }
+}
+
+//styled input field
+pub fn styledInput(label: [*c]const u8, value_buffer: []u8) []const u8 {
+    return styledInputWithOnChange(label, value_buffer, null, null);
+}
+
+pub fn styledInputWithOnChange(label: [*c]const u8, value_buffer: []u8, on_change: ?InputOnChangeFn, user_data: ?*anyopaque) []const u8 {
+    c.igPushStyleVar_Float(c.ImGuiStyleVar_FrameRounding, 2.0);
+    c.igPushStyleVar_Vec2(c.ImGuiStyleVar_FramePadding, .{ .x = 8, .y = 6 });
+    c.igPushStyleColor_Vec4(c.ImGuiCol_FrameBg, .{ .x = 0.12, .y = 0.12, .z = 0.12, .w = 1.0 });
+    c.igPushStyleColor_Vec4(c.ImGuiCol_FrameBgHovered, .{ .x = 0.20, .y = 0.20, .z = 0.20, .w = 1.0 });
+    c.igPushStyleColor_Vec4(c.ImGuiCol_FrameBgActive, .{ .x = 0.28, .y = 0.28, .z = 0.28, .w = 1.0 });
+
+    const buf_ptr: [*c]u8 = @ptrCast(value_buffer.ptr);
+    var flags: c.ImGuiInputTextFlags = c.ImGuiInputTextFlags_None;
+    var callback: c.ImGuiInputTextCallback = null;
+    var callback_user_data: ?*anyopaque = user_data;
+    var callback_ctx: InputTextCallbackCtx = undefined;
+
+    if (on_change) |on_change_fn| {
+        flags |= c.ImGuiInputTextFlags_CallbackEdit;
+        callback_ctx = .{ .on_change = on_change_fn, .user_data = user_data };
+        callback = inputTextOnEdit;
+        callback_user_data = &callback_ctx;
+    }
+    c.igSetNextItemWidth(100);
+    _ = c.igInputText(label, buf_ptr, value_buffer.len, flags, callback, callback_user_data);
+
+    const len = std.mem.indexOfScalar(u8, value_buffer, 0) orelse value_buffer.len;
+    const updated_value = value_buffer[0..len];
+
+    c.igPopStyleColor(3);
+    c.igPopStyleVar(2);
+    return updated_value;
 }

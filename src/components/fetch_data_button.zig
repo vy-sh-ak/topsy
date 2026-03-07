@@ -36,7 +36,7 @@ fn parseDateToUnixSeconds(date: []const u8) !f64 {
 }
 
 pub fn fetchDataButton(current_symbol: []const u8, current_date: [10]u8, end_date: [10]u8, allocator: std.mem.Allocator) !?candle_chart.CandleChartData {
-    if (!imgui.button("Fetch Data")) return null;
+    if (!imgui.styledButtonVariant("Fetch Data", .Primary)) return null;
 
     std.debug.print("Fetching data for {s} from {s} to {s}\n", .{ current_symbol, end_date, current_date });
 
@@ -70,17 +70,6 @@ pub fn fetchDataButton(current_symbol: []const u8, current_date: [10]u8, end_dat
             .ignore_unknown_fields = true,
         });
         defer parsed.deinit();
-        std.debug.print("Parsed {d} companies from response\n", .{parsed.value.len});
-        // print entire parsed data for debugging
-        for (parsed.value) |company| {
-            std.debug.print("Company: {s}, Price Rows: {d}\n", .{company.ticker, company.data.len});
-            for (company.data) |row| {
-                std.debug.print(
-                    "  Date: {s}, Open: {}, Close: {}, Low: {}, High: {}\n",
-                    .{ row.Date, row.@"Opening Price", row.@"Last Closing Price", row.@"Lowest Price", row.@"Highest Price" },
-                );
-            }
-        }
         if (parsed.value.len == 0 or parsed.value[0].data.len == 0) {
             std.debug.print("No candle data in response\n", .{});
             return null;

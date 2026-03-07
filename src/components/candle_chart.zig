@@ -69,11 +69,10 @@ pub fn renderCandleChart(data: ?*const CandleChartData) void {
     const chart_highs: []const f64 = if (data) |d| d.highs else highs[0..];
     if (chart_dates.len == 0) return;
 
-    _ = imgui.c.igCheckbox("Show Tooltip", &show_tooltip);
-    imgui.c.igSameLine(0, 10.0);
-    _ = imgui.c.igColorEdit4("##Bull", &bullCol.x, imgui.c.ImGuiColorEditFlags_NoInputs);
-    imgui.c.igSameLine(0, 10.0);
-    _ = imgui.c.igColorEdit4("##Bear", &bearCol.x, imgui.c.ImGuiColorEditFlags_NoInputs);
+    // imgui.c.igSameLine(0, 10.0);
+    // _ = imgui.c.igColorEdit4("##Bull", &bullCol.x, imgui.c.ImGuiColorEditFlags_NoInputs);
+    // imgui.c.igSameLine(0, 10.0);
+    // _ = imgui.c.igColorEdit4("##Bear", &bearCol.x, imgui.c.ImGuiColorEditFlags_NoInputs);
 
     implot.c.ImPlot_GetStyle().*.UseLocalTime = false;
 
@@ -134,5 +133,6 @@ pub fn renderCandleChart(data: ?*const CandleChartData) void {
 
         implot.c.ImPlot_EndPlot();
     }
+    _ = imgui.c.igCheckbox("Show Tooltip", &show_tooltip);
     implot.c.ImPlot_PopStyleColor(implot.c.ImPlotCol_PlotBg);
 }
