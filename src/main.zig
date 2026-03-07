@@ -12,6 +12,7 @@ const gl = @cImport({
     @cInclude("GLFW/glfw3.h");
 });
 const utils = @import("utils.zig");
+const cco = @import("./components/candle_chart_options.zig");
 
 fn onSymbolInputChange(value: []const u8, user_data: ?*anyopaque) void {
     const raw = user_data orelse return;
@@ -50,7 +51,7 @@ pub fn main() !void {
 
     const io = imgui.getIO();
     const interFont = imgui.setFont(io, @embedFile("assets/inter.ttf"));
-
+    var candle_chart_options = cco.CandleChartOptions{ .showToolTip = true };
     var symbol_buffer: [16]u8 = [_]u8{0} ** 16;
     var current_symbol: []const u8 = setSymbolBuffer(symbol_buffer[0..], "ADSK");
     // const symbols = [_][]const u8{ "ADSK", "AAPL" };
@@ -64,7 +65,7 @@ pub fn main() !void {
         imgui.newFrame();
         const window_size = glfw.getWindowSize(window);
         imgui.setFullSize(@floatFromInt(window_size.w), @floatFromInt(window_size.h));
-        if (imgui.begin("Topsy Dashboard", imgui.ImguiWindowFlags{ .NoTitleBar = true, .NoResize = true, .NoMove = true, .NoScrollbar = true, .NoCollapse = true })) {
+        if (imgui.begin("Topsy Dashboard", imgui.ImguiWindowFlags{ .NoTitleBar = true, .NoResize = true, .NoMove = true, .NoScrollbar = true, .NoCollapse = true, .MenuBar = false })) {
             imgui.pushFont(interFont);
             current_symbol = imgui.styledInputWithOnChange("##symbol", symbol_buffer[0..], onSymbolInputChange, @ptrCast(&current_symbol));
             // imgui.dropdown("Symbols", &symbols, &current_symbol);
@@ -78,7 +79,10 @@ pub fn main() !void {
                 if (chart_data) |*old_data| old_data.deinit();
                 chart_data = new_data;
             }
-            candle_chart.renderCandleChart(if (chart_data) |*d| d else null);
+            imgui.separator();
+            imgui.c.igSameLine(0, 10.0);
+            candle_chart_options.render();
+            candle_chart.renderCandleChart(if (chart_data) |*d| d else null, &candle_chart_options);
             imgui.popFont();
         }
         imgui.end();

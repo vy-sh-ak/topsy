@@ -1,7 +1,7 @@
 const std = @import("std");
 const imgui = @import("../gui/imgui.zig");
 const implot = @import("../gui/implot.zig");
-
+const cco = @import("./candle_chart_options.zig");
 const dates: [10]f64 = .{
     1704067200, // 2024-01-01
     1704153600, // 2024-01-02
@@ -20,7 +20,6 @@ const closes = [_]f64{ 102.5, 101.0, 105.0, 103.5, 107.0, 106.0, 109.0, 108.0, 1
 const lows = [_]f64{ 99.0, 100.0, 100.5, 102.0, 103.0, 105.5, 105.0, 107.5, 107.0, 109.0 };
 const highs = [_]f64{ 103.0, 103.5, 106.0, 106.0, 108.0, 108.5, 110.0, 110.5, 113.5, 113.0 };
 
-var show_tooltip: bool = false;
 var bullCol: implot.c.ImVec4 = .{ .x = 0.000, .y = 1.000, .z = 0.441, .w = 1.000 };
 var bearCol: implot.c.ImVec4 = .{ .x = 0.853, .y = 0.050, .z = 0.310, .w = 1.000 };
 var last_range_len: usize = 0;
@@ -60,7 +59,7 @@ pub const CandleChartData = struct {
     }
 };
 
-pub fn renderCandleChart(data: ?*const CandleChartData) void {
+pub fn renderCandleChart(data: ?*const CandleChartData, options: *cco.CandleChartOptions) void {
     const chart_symbol: [:0]const u8 = if (data) |d| d.symbol else "GOOGL";
     const chart_dates: []const f64 = if (data) |d| d.dates else dates[0..];
     const chart_opens: []const f64 = if (data) |d| d.opens else opens[0..];
@@ -68,11 +67,6 @@ pub fn renderCandleChart(data: ?*const CandleChartData) void {
     const chart_lows: []const f64 = if (data) |d| d.lows else lows[0..];
     const chart_highs: []const f64 = if (data) |d| d.highs else highs[0..];
     if (chart_dates.len == 0) return;
-
-    // imgui.c.igSameLine(0, 10.0);
-    // _ = imgui.c.igColorEdit4("##Bull", &bullCol.x, imgui.c.ImGuiColorEditFlags_NoInputs);
-    // imgui.c.igSameLine(0, 10.0);
-    // _ = imgui.c.igColorEdit4("##Bear", &bearCol.x, imgui.c.ImGuiColorEditFlags_NoInputs);
 
     implot.c.ImPlot_GetStyle().*.UseLocalTime = false;
 
@@ -129,10 +123,9 @@ pub fn renderCandleChart(data: ?*const CandleChartData) void {
 
         // Draw the candlestick chart
         const candle_width_pct: f32 = if (chart_dates.len > 1) 0.25 else 60.0 * 60.0 * 8.0;
-        implot.plotCandleStick(chart_symbol.ptr, chart_dates, chart_opens, chart_closes, chart_lows, chart_highs, @intCast(chart_dates.len), show_tooltip, candle_width_pct, bullCol, bearCol);
+        implot.plotCandleStick(chart_symbol.ptr, chart_dates, chart_opens, chart_closes, chart_lows, chart_highs, @intCast(chart_dates.len), options.showToolTip, candle_width_pct, bullCol, bearCol);
 
         implot.c.ImPlot_EndPlot();
     }
-    _ = imgui.c.igCheckbox("Show Tooltip", &show_tooltip);
     implot.c.ImPlot_PopStyleColor(implot.c.ImPlotCol_PlotBg);
 }

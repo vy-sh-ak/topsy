@@ -36,6 +36,7 @@ pub const ImguiWindowFlags = struct {
     NoMove: bool,
     NoScrollbar: bool,
     NoCollapse: bool,
+    MenuBar: bool = false,
 };
 pub fn begin(name: [*c]const u8, flags: ImguiWindowFlags) bool {
     var combined_flags: c.ImGuiWindowFlags = 0;
@@ -44,6 +45,7 @@ pub fn begin(name: [*c]const u8, flags: ImguiWindowFlags) bool {
     if (flags.NoMove) combined_flags |= c.ImGuiWindowFlags_NoMove;
     if (flags.NoScrollbar) combined_flags |= c.ImGuiWindowFlags_NoScrollbar;
     if (flags.NoCollapse) combined_flags |= c.ImGuiWindowFlags_NoCollapse;
+    if (flags.MenuBar) combined_flags |= c.ImGuiWindowFlags_MenuBar;
     return c.igBegin(name, null, combined_flags);
 }
 pub fn end() void {
@@ -59,6 +61,7 @@ pub fn button(label: [*c]const u8) bool {
 pub const ButtonVariant = enum {
     Primary,
     Secondary,
+    Ternary,
 };
 
 const ButtonColors = struct {
@@ -75,9 +78,14 @@ fn getButtonColors(variant: ButtonVariant) ButtonColors {
             .active = .{ .x = 0.82, .y = 0.27, .z = 0.08, .w = 1.0 },
         },
         .Secondary => .{
-            .base = .{ .x = 0.20, .y = 0.14, .z = 0.30, .w = 1.0 },
-            .hover = .{ .x = 0.28, .y = 0.20, .z = 0.40, .w = 1.0 },
-            .active = .{ .x = 0.16, .y = 0.11, .z = 0.24, .w = 1.0 },
+            .base = .{ .x = 0.28, .y = 0.21, .z = 0.40, .w = 1.0 },
+            .hover = .{ .x = 0.36, .y = 0.28, .z = 0.50, .w = 1.0 },
+            .active = .{ .x = 0.24, .y = 0.18, .z = 0.34, .w = 1.0 },
+        },
+        .Ternary => .{
+            .base = .{ .x = 0.18, .y = 0.18, .z = 0.20, .w = 1.0 },
+            .hover = .{ .x = 0.25, .y = 0.25, .z = 0.28, .w = 1.0 },
+            .active = .{ .x = 0.32, .y = 0.32, .z = 0.36, .w = 1.0 },
         },
     };
 }
@@ -101,6 +109,56 @@ pub fn styledButtonVariant(label: [*c]const u8, variant: ButtonVariant) bool {
     c.igPopStyleColor(4);
     c.igPopStyleVar(2);
     return pressed;
+}
+
+pub fn styledCheckbox(label: [*c]const u8, value: *bool) bool {
+    return styledCheckboxVariant(label, value, .Secondary);
+}
+
+pub fn styledCheckboxVariant(label: [*c]const u8, value: *bool, variant: ButtonVariant) bool {
+    const colors = getButtonColors(variant);
+
+    c.igPushStyleVar_Float(c.ImGuiStyleVar_FrameRounding, 2.0);
+    c.igPushStyleVar_Vec2(c.ImGuiStyleVar_FramePadding, .{ .x = 8, .y = 6 });
+    c.igPushStyleColor_Vec4(c.ImGuiCol_FrameBg, colors.base);
+    c.igPushStyleColor_Vec4(c.ImGuiCol_FrameBgHovered, colors.hover);
+    c.igPushStyleColor_Vec4(c.ImGuiCol_FrameBgActive, colors.active);
+    c.igPushStyleColor_Vec4(c.ImGuiCol_CheckMark, .{ .x = 0.96, .y = 0.96, .z = 0.98, .w = 1.0 });
+    c.igPushStyleColor_Vec4(c.ImGuiCol_Text, .{ .x = 0.96, .y = 0.96, .z = 0.98, .w = 1.0 });
+
+    const changed = c.igCheckbox(label, value);
+
+    c.igPopStyleColor(5);
+    c.igPopStyleVar(2);
+    return changed;
+}
+
+pub fn styledPopup(id: [*c]const u8) bool {
+    c.igPushStyleVar_Float(c.ImGuiStyleVar_PopupRounding, 2.0);
+    c.igPushStyleVar_Vec2(c.ImGuiStyleVar_WindowPadding, .{ .x = 8, .y = 8 });
+    c.igPushStyleColor_Vec4(c.ImGuiCol_PopupBg, .{ .x = 0.16, .y = 0.16, .z = 0.18, .w = 1.0 });
+    c.igPushStyleColor_Vec4(c.ImGuiCol_Border, .{ .x = 0.28, .y = 0.21, .z = 0.40, .w = 1.0 });
+    c.igPushStyleColor_Vec4(c.ImGuiCol_Header, .{ .x = 0.28, .y = 0.21, .z = 0.40, .w = 1.0 });
+    c.igPushStyleColor_Vec4(c.ImGuiCol_HeaderHovered, .{ .x = 0.36, .y = 0.28, .z = 0.50, .w = 1.0 });
+    c.igPushStyleColor_Vec4(c.ImGuiCol_HeaderActive, .{ .x = 0.24, .y = 0.18, .z = 0.34, .w = 1.0 });
+    c.igPushStyleColor_Vec4(c.ImGuiCol_Text, .{ .x = 0.96, .y = 0.96, .z = 0.98, .w = 1.0 });
+
+    const is_open = c.igBeginPopup(id, c.ImGuiPopupFlags_None);
+    if (!is_open) {
+        c.igPopStyleColor(6);
+        c.igPopStyleVar(2);
+    }
+    return is_open;
+}
+
+pub fn styledPopupEnd() void {
+    c.igEndPopup();
+    c.igPopStyleColor(6);
+    c.igPopStyleVar(2);
+}
+
+pub fn styledMenuItem(label: [*c]const u8, selected: bool) bool {
+    return c.igMenuItem_Bool(label, null, selected, true);
 }
 
 pub fn sliderFloat(label: [*c]const u8, v: *f32, min: f32, max: f32) bool {
@@ -168,7 +226,23 @@ fn inputTextOnEdit(data: [*c]c.ImGuiInputTextCallbackData) callconv(.c) c_int {
 
 //combo or dropdown
 pub fn dropdown(label: [*c]const u8, options: []const []const u8, current_value: *[]const u8) void {
-    c.igSetNextItemWidth(100.0);
+    const label_size = c.igCalcTextSize(label, null, true, 0.0);
+    const preview_size = c.igCalcTextSize(current_value.*.ptr, null, false, 0.0);
+    const dynamic_width = @max(label_size.x, preview_size.x) + 28.0;
+
+    c.igPushStyleVar_Float(c.ImGuiStyleVar_FrameRounding, 2.0);
+    c.igPushStyleVar_Vec2(c.ImGuiStyleVar_FramePadding, .{ .x = 8, .y = 6 });
+    c.igPushStyleColor_Vec4(c.ImGuiCol_FrameBg, .{ .x = 0.18, .y = 0.18, .z = 0.20, .w = 1.0 });
+    c.igPushStyleColor_Vec4(c.ImGuiCol_FrameBgHovered, .{ .x = 0.25, .y = 0.25, .z = 0.28, .w = 1.0 });
+    c.igPushStyleColor_Vec4(c.ImGuiCol_FrameBgActive, .{ .x = 0.32, .y = 0.32, .z = 0.36, .w = 1.0 });
+    c.igPushStyleColor_Vec4(c.ImGuiCol_PopupBg, .{ .x = 0.16, .y = 0.16, .z = 0.18, .w = 1.0 });
+    c.igPushStyleColor_Vec4(c.ImGuiCol_Header, .{ .x = 0.28, .y = 0.21, .z = 0.40, .w = 1.0 });
+    c.igPushStyleColor_Vec4(c.ImGuiCol_HeaderHovered, .{ .x = 0.36, .y = 0.28, .z = 0.50, .w = 1.0 });
+    c.igPushStyleColor_Vec4(c.ImGuiCol_HeaderActive, .{ .x = 0.24, .y = 0.18, .z = 0.34, .w = 1.0 });
+    c.igPushStyleColor_Vec4(c.ImGuiCol_Button, .{ .x = 0.18, .y = 0.18, .z = 0.20, .w = 1.0 });
+    c.igPushStyleColor_Vec4(c.ImGuiCol_ButtonHovered, .{ .x = 0.25, .y = 0.25, .z = 0.28, .w = 1.0 });
+    c.igPushStyleColor_Vec4(c.ImGuiCol_ButtonActive, .{ .x = 0.32, .y = 0.32, .z = 0.36, .w = 1.0 });
+    c.igSetNextItemWidth(dynamic_width);
     if (c.igBeginCombo(label, current_value.*.ptr, c.ImGuiComboFlags_HeightLarge)) {
         for (options) |option| {
             const is_selected = std.mem.eql(u8, current_value.*, option);
@@ -181,6 +255,9 @@ pub fn dropdown(label: [*c]const u8, options: []const []const u8, current_value:
         }
         c.igEndCombo();
     }
+
+    c.igPopStyleColor(10);
+    c.igPopStyleVar(2);
 }
 
 //styled input field
@@ -191,9 +268,9 @@ pub fn styledInput(label: [*c]const u8, value_buffer: []u8) []const u8 {
 pub fn styledInputWithOnChange(label: [*c]const u8, value_buffer: []u8, on_change: ?InputOnChangeFn, user_data: ?*anyopaque) []const u8 {
     c.igPushStyleVar_Float(c.ImGuiStyleVar_FrameRounding, 2.0);
     c.igPushStyleVar_Vec2(c.ImGuiStyleVar_FramePadding, .{ .x = 8, .y = 6 });
-    c.igPushStyleColor_Vec4(c.ImGuiCol_FrameBg, .{ .x = 0.12, .y = 0.12, .z = 0.12, .w = 1.0 });
-    c.igPushStyleColor_Vec4(c.ImGuiCol_FrameBgHovered, .{ .x = 0.20, .y = 0.20, .z = 0.20, .w = 1.0 });
-    c.igPushStyleColor_Vec4(c.ImGuiCol_FrameBgActive, .{ .x = 0.28, .y = 0.28, .z = 0.28, .w = 1.0 });
+    c.igPushStyleColor_Vec4(c.ImGuiCol_FrameBg, .{ .x = 0.18, .y = 0.18, .z = 0.20, .w = 1.0 });
+    c.igPushStyleColor_Vec4(c.ImGuiCol_FrameBgHovered, .{ .x = 0.25, .y = 0.25, .z = 0.28, .w = 1.0 });
+    c.igPushStyleColor_Vec4(c.ImGuiCol_FrameBgActive, .{ .x = 0.32, .y = 0.32, .z = 0.36, .w = 1.0 });
 
     const buf_ptr: [*c]u8 = @ptrCast(value_buffer.ptr);
     var flags: c.ImGuiInputTextFlags = c.ImGuiInputTextFlags_None;
@@ -216,4 +293,11 @@ pub fn styledInputWithOnChange(label: [*c]const u8, value_buffer: []u8, on_chang
     c.igPopStyleColor(3);
     c.igPopStyleVar(2);
     return updated_value;
+}
+
+pub fn separator() void {
+    c.igPushStyleColor_Vec4(c.ImGuiCol_Separator, .{ .x = 0.22, .y = 0.22, .z = 0.24, .w = 1.0 });
+    c.igSameLine(0, 10.0);
+    c.igSeparatorEx(c.ImGuiSeparatorFlags_Vertical, 1);
+    c.igPopStyleColor(1);
 }
